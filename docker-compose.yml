@@ -1,0 +1,15 @@
+
+services:
+  app:
+    image: public-transportation-routing-genetic-algorithm:0.1.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 0.0.0.0:8080:8501
+    networks:
+      - default-network
+
+networks:
+  default-network:
+    driver: bridge
