@@ -16,7 +16,7 @@ from plotting import (
     plot_individ,
     plot_structure,
 )
-from ga.toolbox import _routes
+from ga.utils import individual_to_routes
 
 
 def ui_settings(layout: DeltaGenerator) -> Settings:
@@ -171,7 +171,7 @@ def ui_main(
     st.session_state.demand_matrix = graph["demand_matrix"]
 
     with layout.popover("Просмотреть датасет"):
-        fig, _ = plot_structure(st.session_state.nodes, st.session_state.demand_matrix)
+        fig, _ = plot_structure(st.session_state.nodes, st.session_state.demand_matrix, node_size=100, font_size=5)
         st.pyplot(fig)
 
     start_execution = layout.button("Начать выполнение")
@@ -247,6 +247,6 @@ def ui_main(
     chart_container.line_chart(st.session_state.logbook, x="generation_index", y=["min", "max", "mean", "std"])
     dataframe_container.dataframe(st.session_state.logbook)
 
-    individ = st.session_state.logbook[-1]["fittest_individ"]
-    fig, _ = plot_individ(st.session_state.nodes, _routes(individ))
+    individual = st.session_state.logbook[-1]["fittest_individual"]
+    fig, _ = plot_individ(st.session_state.nodes, individual_to_routes(individual), node_size=100, font_size=5)
     individ_container.pyplot(fig)

@@ -31,7 +31,10 @@ class Palette:
 
 def plot_individ(
     nodes: dict[int, Tuple[float, float]],
-    routes: list[list[int]]
+    routes: list[list[int]],
+    *,
+    node_size: int=300,
+    font_size: int=12
 ):
 
     depot = 0
@@ -44,9 +47,28 @@ def plot_individ(
 
     positions = nx.get_node_attributes(graph, "position")
 
-    nx.draw_networkx_nodes(graph, positions, nodelist=[node for node in nodes if node != depot], node_color=palette.node, ax=ax)
-    nx.draw_networkx_nodes(graph, positions, nodelist=[0], node_color=palette.depot, ax=ax)
-    nx.draw_networkx_labels(graph, positions, font_size=8, font_color="black", ax=ax)
+    nx.draw_networkx_nodes(
+        graph,
+        positions,
+        nodelist=[node for node in nodes if node != depot],
+        node_size=node_size,
+        node_color=palette.node,
+        ax=ax
+    )
+    nx.draw_networkx_nodes(
+        graph,
+        positions,
+        nodelist=[0],
+        node_size=node_size,
+        node_color=palette.depot,
+        ax=ax
+    )
+    nx.draw_networkx_labels(
+        graph,
+        positions,
+        font_size=font_size,
+        ax=ax
+    )
 
     color_generator = palette.edge
 
@@ -59,9 +81,24 @@ def plot_individ(
     for route in routes:
         edgelist = [(route[i], route[i + 1]) for i in range(len(route) - 1)]
         current_edge_color = next(color_generator)
-        nx.draw_networkx_edges(graph, positions, edgelist=edgelist, edge_color=current_edge_color, width=current_width, ax=ax)
+        nx.draw_networkx_edges(
+            graph,
+            positions,
+            edgelist=edgelist,
+            edge_color=current_edge_color,
+            width=current_width,
+            ax=ax
+        )
         depot_edge = (depot, route[0]) if distance(nodes[depot], nodes[route[0]]) < distance(nodes[depot], nodes[route[-1]]) else (route[-1], depot)
-        nx.draw_networkx_edges(graph, positions, edgelist=[depot_edge], edge_color=current_edge_color, style="dashed", width=current_width, ax=ax)
+        nx.draw_networkx_edges(
+            graph,
+            positions,
+            edgelist=[depot_edge],
+            edge_color=current_edge_color,
+            style="dashed",
+            width=current_width,
+            ax=ax
+        )
         current_width -= width_step
 
     return fig, ax
@@ -70,6 +107,9 @@ def plot_individ(
 def plot_structure(
     nodes: dict[int, Tuple[float, float]],
     demand_matrix: list[list[int]],
+    *,
+    node_size: int=300,
+    font_size: int=12
 ):
 
     palette = Palette()
@@ -88,10 +128,42 @@ def plot_structure(
 
     positions = nx.get_node_attributes(graph, "position")
 
-    nx.draw_networkx_nodes(graph, positions, nodelist=[node for node in nodes if node != depot], node_color=palette.node, ax=ax)
-    nx.draw_networkx_nodes(graph, positions, nodelist=[0], node_color=palette.depot, ax=ax)
-    nx.draw_networkx_labels(graph, positions, font_size=8, font_color="black", ax=ax)
-    nx.draw_networkx_edges(graph, positions, edgelist=graph.edges(), width=2, ax=ax)
-    nx.draw_networkx_edge_labels(graph, positions, edge_labels={(i, j): graph[i][j]["demand"] for i, j in graph.edges()}, label_pos=0.7, ax=ax)
+    nx.draw_networkx_nodes(
+        graph,
+        positions,
+        nodelist=[node for node in nodes if node != depot],
+        node_size=node_size,
+        node_color=palette.node,
+        ax=ax
+    )
+    nx.draw_networkx_nodes(
+        graph,
+        positions,
+        nodelist=[0],
+        node_size=node_size,
+        node_color=palette.depot,
+        ax=ax
+    )
+    nx.draw_networkx_labels(
+        graph,
+        positions,
+        font_size=font_size,
+        font_color="black",
+        ax=ax
+    )
+    nx.draw_networkx_edges(
+        graph,
+        positions,
+        edgelist=graph.edges(),
+        width=2,
+        ax=ax
+    )
+    nx.draw_networkx_edge_labels(
+        graph,
+        positions,
+        edge_labels={(i, j): graph[i][j]["demand"] for i, j in graph.edges()},
+        label_pos=0.7,
+        ax=ax
+    )
 
     return fig, ax

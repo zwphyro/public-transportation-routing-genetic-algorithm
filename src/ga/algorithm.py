@@ -7,7 +7,7 @@ from deap import (
 )
 
 
-def _get_fittest_individ(population):
+def _get_fittest_individual(population):
     return tools.selBest(population, 1)[0]
 
 
@@ -20,7 +20,7 @@ def algorithm(
 ) -> Iterable[tuple[list, tools.Logbook]]:
 
     logbook = tools.Logbook()
-    logbook.header = ["generation_index", "fittest_individ"] + stats.fields
+    logbook.header = ["generation_index", "fittest_individual"] + stats.fields
 
     fitnesses = list(map(toolbox.evaluate, population))
     for individ, fitness in zip(population, fitnesses):
@@ -28,9 +28,9 @@ def algorithm(
 
     generation_index = 0
 
-    fittest_individ = _get_fittest_individ(population)
+    fittest_individual = _get_fittest_individual(population)
     record = stats.compile(population)
-    logbook.record(generation_index=generation_index, fittest_individ=fittest_individ, **record)
+    logbook.record(generation_index=generation_index, fittest_individual=fittest_individual, **record)
 
     yield population, logbook
 
@@ -72,8 +72,8 @@ def algorithm(
         new_population = toolbox.select_population(population, offsprings)
         population[:] = new_population
 
-        fittest_individ = _get_fittest_individ(population)
+        fittest_individual = _get_fittest_individual(population)
         record = stats.compile(population)
-        logbook.record(generation_index=generation_index, fittest_individ=fittest_individ, **record)
+        logbook.record(generation_index=generation_index, fittest_individual=fittest_individual, **record)
 
         yield population, logbook

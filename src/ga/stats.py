@@ -1,6 +1,4 @@
-from deap import (
-    tools,
-)
+from deap import tools
 import numpy as np
 
 
@@ -14,4 +12,3 @@ def get_stats() -> tools.Statistics:
     stats.register("std", np.std)
 
     return stats
-
