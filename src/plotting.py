@@ -7,7 +7,6 @@ from matplotlib import colormaps
 from matplotlib import colors
 import networkx as nx
 
-colors.to_hex
 
 def distance(
     node1: Tuple[float, float],
