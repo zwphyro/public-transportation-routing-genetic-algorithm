@@ -1,12 +1,9 @@
 import json
-from typing import (
-    Any,
-    Callable,
-)
 
 from deap.tools import Logbook
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
+import networkx as nx
 
 from settings import (
     Settings,
@@ -16,7 +13,9 @@ from plotting import (
     plot_individ,
     plot_structure,
 )
+
 from ga.utils import individual_to_routes
+from ga.algorithm import run_algorithm
 
 
 def ui_settings(layout: DeltaGenerator) -> Settings:
@@ -144,15 +143,17 @@ def ui_settings(layout: DeltaGenerator) -> Settings:
 
 def ui_main(
     layout: DeltaGenerator,
-    settings: Settings,
-    run_algorithm: Callable[[Any, Any, Settings, Callable[[list, Logbook], None]], None],
+    settings: Settings
 ) -> None:
 
-    if "nodes" not in st.session_state:
-        st.session_state.nodes = None
+    if "graph" not in st.session_state:
+        st.session_state.graph = None
 
-    if "demand_matrix" not in st.session_state:
-        st.session_state.demand_matrix = None
+    # if "nodes" not in st.session_state:
+    #     st.session_state.nodes = None
+    #
+    # if "demand_matrix" not in st.session_state:
+    #     st.session_state.demand_matrix = None
 
     if "logbook" not in st.session_state:
         st.session_state.logbook = None
@@ -163,15 +164,20 @@ def ui_main(
 
 
     if graph_file is None:
+        st.session_state.graph = None
         return
 
-    graph = json.loads(graph_file.getvalue().decode("utf-8"))
+    try:
+        graph = nx.node_link_graph(json.loads(graph_file.getvalue().decode("utf-8")), edges="edges")
+    except:
+        st.session_state.graph = None
+        layout.error("Неверный формат датасета")
+        return
 
-    st.session_state.nodes = {int(node): position for node, position in graph["nodes"].items()}
-    st.session_state.demand_matrix = graph["demand_matrix"]
+    st.session_state.graph = graph
 
     with layout.popover("Просмотреть датасет"):
-        fig, _ = plot_structure(st.session_state.nodes, st.session_state.demand_matrix, node_size=100, font_size=5)
+        fig, _ = plot_structure(st.session_state.graph, node_size=100, font_size=5)
         st.pyplot(fig)
 
     start_execution = layout.button("Начать выполнение")
@@ -230,8 +236,7 @@ def ui_main(
             update_metrics(current_stats)
 
         run_algorithm(
-            st.session_state.nodes,
-            st.session_state.demand_matrix,
+            st.session_state.graph,
             settings,
             iteration_callback
         )
@@ -248,5 +253,5 @@ def ui_main(
     dataframe_container.dataframe(st.session_state.logbook)
 
     individual = st.session_state.logbook[-1]["fittest_individual"]
-    fig, _ = plot_individ(st.session_state.nodes, individual_to_routes(individual), node_size=100, font_size=5)
+    fig, _ = plot_individ(st.session_state.graph, individual_to_routes(individual), node_size=100, font_size=5)
     individ_container.pyplot(fig)

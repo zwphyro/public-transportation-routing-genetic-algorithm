@@ -27,5 +27,6 @@ package-mode = false
 
 [tool.pyright]
 executionEnvironments = [
-    { root = "src/ga",  reportAttributeAccessIssue = false }
+    { root = "src/ga",  reportAttributeAccessIssue = false },
+    { root = "." }
 ]

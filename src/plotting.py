@@ -30,41 +30,41 @@ class Palette:
 
 
 def plot_individ(
-    nodes: dict[int, Tuple[float, float]],
+    graph: nx.DiGraph,
     routes: list[list[int]],
     *,
     node_size: int=300,
     font_size: int=12
 ):
 
-    depot = 0
+    depot = [node for node in graph if graph.nodes[node]["is_depot"]][0]
     palette = Palette()
 
-    graph = nx.Graph()
+    routes_graph = nx.Graph()
 
-    graph.add_nodes_from([(node, {"position": nodes[node]}) for node in nodes])
+    routes_graph.add_nodes_from([(node, {"position": graph.nodes[node]["position"]}) for node in graph])
     fig, ax = plt.subplots()
 
-    positions = nx.get_node_attributes(graph, "position")
+    positions = nx.get_node_attributes(routes_graph, "position")
 
     nx.draw_networkx_nodes(
-        graph,
+        routes_graph,
         positions,
-        nodelist=[node for node in nodes if node != depot],
+        nodelist=[node for node in routes_graph if node != depot],
         node_size=node_size,
         node_color=palette.node,
         ax=ax
     )
     nx.draw_networkx_nodes(
-        graph,
+        routes_graph,
         positions,
-        nodelist=[0],
+        nodelist=[depot],
         node_size=node_size,
         node_color=palette.depot,
         ax=ax
     )
     nx.draw_networkx_labels(
-        graph,
+        routes_graph,
         positions,
         font_size=font_size,
         ax=ax
@@ -82,21 +82,28 @@ def plot_individ(
         edgelist = [(route[i], route[i + 1]) for i in range(len(route) - 1)]
         current_edge_color = next(color_generator)
         nx.draw_networkx_edges(
-            graph,
+            routes_graph,
             positions,
             edgelist=edgelist,
             edge_color=current_edge_color,
             width=current_width,
+            node_size=node_size,
             ax=ax
         )
-        depot_edge = (depot, route[0]) if distance(nodes[depot], nodes[route[0]]) < distance(nodes[depot], nodes[route[-1]]) else (route[-1], depot)
+
+        direct_depot_distance = graph.edges[depot, route[0]]["distance"] + graph.edges[route[0], depot]["distance"]
+        reverse_depot_distance = graph.edges[depot, route[-1]]["distance"] + graph.edges[route[-1], depot]["distance"]
+
+        depot_edge = (depot, route[0]) if direct_depot_distance < reverse_depot_distance else (route[-1], depot)
+
         nx.draw_networkx_edges(
-            graph,
+            routes_graph,
             positions,
             edgelist=[depot_edge],
             edge_color=current_edge_color,
             style="dashed",
             width=current_width,
+            node_size=node_size,
             ax=ax
         )
         current_width -= width_step
@@ -105,24 +112,14 @@ def plot_individ(
 
 
 def plot_structure(
-    nodes: dict[int, Tuple[float, float]],
-    demand_matrix: list[list[int]],
+    graph: nx.DiGraph,
     *,
     node_size: int=300,
-    font_size: int=12
+    font_size: int=12,
+    display_connections: bool=False
 ):
 
     palette = Palette()
-    depot = 0
-
-    graph = nx.DiGraph()
-
-    graph.add_nodes_from([(node, {"position": nodes[node]}) for node in nodes])
-
-    for i in nodes:
-        for j in nodes:
-            if i != j and demand_matrix[i][j] != 0:
-                graph.add_edge(i, j, demand=demand_matrix[i][j])
 
     fig, ax = plt.subplots()
 
@@ -131,7 +128,7 @@ def plot_structure(
     nx.draw_networkx_nodes(
         graph,
         positions,
-        nodelist=[node for node in nodes if node != depot],
+        nodelist=[node for node in graph if not graph.nodes[node]["is_depot"]],
         node_size=node_size,
         node_color=palette.node,
         ax=ax
@@ -139,7 +136,7 @@ def plot_structure(
     nx.draw_networkx_nodes(
         graph,
         positions,
-        nodelist=[0],
+        nodelist=[node for node in graph if graph.nodes[node]["is_depot"]],
         node_size=node_size,
         node_color=palette.depot,
         ax=ax
@@ -148,22 +145,36 @@ def plot_structure(
         graph,
         positions,
         font_size=font_size,
-        font_color="black",
         ax=ax
     )
+    if display_connections:
+        distance_edges = [edge for edge in graph.edges() if graph.edges[edge]["distance"] is not None] 
+        nx.draw_networkx_edges(
+            graph,
+            positions,
+            edgelist=distance_edges,
+            edge_color="#CCCCCC05",
+            node_size=node_size,
+            width=2,
+            ax=ax
+        )
+    demand_edges = [edge for edge in graph.edges() if graph.edges[edge]["demand"] != 0]
     nx.draw_networkx_edges(
         graph,
         positions,
-        edgelist=graph.edges(),
+        edgelist=demand_edges,
+        node_size=node_size,
         width=2,
         ax=ax
     )
     nx.draw_networkx_edge_labels(
         graph,
         positions,
-        edge_labels={(i, j): graph[i][j]["demand"] for i, j in graph.edges()},
+        edge_labels={edge: graph.edges[edge]["demand"] for edge in demand_edges},
         label_pos=0.7,
+        font_size=font_size,
         ax=ax
     )
+
 
     return fig, ax

@@ -1,13 +1,19 @@
-from typing import Iterable
+from typing import Callable, Iterable
 import random
 
 from deap import (
     base,
     tools,
 )
+import networkx as nx
+
+from settings import Settings # type: ignore
+
+from .stats import get_stats
+from .toolbox import get_toolbox
 
 
-def _get_fittest_individual(population):
+def _get_fittest_individual(population: list):
     return tools.selBest(population, 1)[0]
 
 
@@ -77,3 +83,42 @@ def algorithm(
         logbook.record(generation_index=generation_index, fittest_individual=fittest_individual, **record)
 
         yield population, logbook
+
+
+def run_algorithm(
+    graph: nx.DiGraph,
+    settings: Settings,
+    iteration_callback: Callable[[list, tools.Logbook], None]
+):
+
+
+    def termitation_criteria(stats: dict):
+        return (settings.is_fittnes_value_limited and stats["min"] <= settings.min_fittness_value) or \
+            (settings.is_generations_amount_limited and stats["generation_index"] >= settings.max_generations_amount) or \
+            (False)
+
+
+    if settings.is_seed_fixed:
+        random.seed(settings.seed)
+
+    toolbox = get_toolbox(
+        graph,
+        settings.routes_amount,
+        settings.full_length_weight,
+        settings.demand_coverage_weight
+    )
+
+    stats = get_stats()
+
+    for population, logbook in algorithm(
+        population=toolbox.population(n=settings.population_size),
+        toolbox=toolbox,
+        cxpb=settings.crossover_probability,
+        mutpb=settings.mutation_probability,
+        stats=stats,
+    ):
+
+        iteration_callback(population, logbook)
+
+        if termitation_criteria(logbook[-1]):
+            break

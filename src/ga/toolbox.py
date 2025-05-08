@@ -1,5 +1,5 @@
 import random
-from typing import Tuple
+from typing import Tuple, TypeAlias
 
 import networkx as nx
 from deap import (
@@ -16,16 +16,15 @@ from .utils import (
 
 creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMin)
+Individual: TypeAlias = list[int | None]
 
 
 def _generate_individual(
-    nodes: dict[int, Tuple[float, float]],
+    graph: nx.DiGraph,
     routes_amount: int
-) -> list[int | None]:
+) -> Individual:
 
-    depot = 0
-
-    nodes_list = [node for node in nodes if node != depot]
+    nodes_list = [node for node in graph if not graph.nodes[node]["is_depot"]]
     random.shuffle(nodes_list)
     
     split_points = sorted(random.sample(range(1, len(nodes_list)), routes_amount - 1))
@@ -42,11 +41,11 @@ def _generate_individual(
 
 
 def _route_distance(
-    nodes: dict[int, Tuple[float, float]],
+    graph: nx.DiGraph,
     route: list[int]
 ) -> float:
 
-    depot = 0
+    depot = [node for node in graph if graph.nodes[node]["is_depot"]][0]
 
     if len(route) == 0:
         return float("inf")
@@ -55,65 +54,86 @@ def _route_distance(
 
     for i in range(len(route) - 1):
 
-        distance += calculate_distance(nodes[route[i]], nodes[route[i + 1]])
+        distance += graph.edges[route[i], route[i + 1]]["distance"] + \
+                    graph.edges[route[i + 1], route[i]]["distance"]
 
-    return distance + min(calculate_distance(nodes[route[0]], nodes[depot]), calculate_distance(nodes[route[-1]], nodes[depot]))
+    direct_depot_distance = graph.edges[depot, route[0]]["distance"] + graph.edges[route[0], depot]["distance"]
+    reverse_depot_distance = graph.edges[depot, route[-1]]["distance"] + graph.edges[route[-1], depot]["distance"]
+    
+    depot_distance = min(direct_depot_distance, reverse_depot_distance)
+
+    return distance + depot_distance
+
+
+def _path_distance(
+    graph: nx.DiGraph,
+    route: list[int]
+) -> float:
+
+    distance = 0
+
+    for i in range(len(route) - 1):
+        distance += graph.edges[route[i], route[i + 1]]["distance"]
+
+    return distance
 
 
 def _coverage(
-    nodes: dict[int, Tuple[float, float]],
-    demand_matrix: list[list[int]],
+    graph: nx.DiGraph,
     routes: list[list[int]]
 ) -> float:
 
-    depot = 0
+    depot = [node for node in graph if graph.nodes[node]["is_depot"]][0]
 
     coverage = 0
 
-    graph = nx.Graph()
+    routes_graph = nx.DiGraph()
 
-    for node in nodes:
-        graph.add_node(node)
+    for node in graph:
+
+        if graph.nodes[node]["is_depot"]:
+            continue
+
+        routes_graph.add_node(node)
 
     for route in routes:
         if len(route) == 0:
             continue
 
         for i in range(len(route) - 1):
-            graph.add_edge(route[i], route[i + 1], distance=calculate_distance(nodes[route[i]], nodes[route[i + 1]]))
+            routes_graph.add_edge(route[i], route[i + 1], distance=graph.edges[route[i], route[i + 1]]["distance"])
+            routes_graph.add_edge(route[i + 1], route[i], distance=graph.edges[route[i + 1], route[i]]["distance"])
 
-        if calculate_distance(nodes[route[0]], nodes[depot]) < calculate_distance(nodes[route[-1]], nodes[depot]):
-            graph.add_edge(route[0], depot, distance=calculate_distance(nodes[route[0]], nodes[depot]))
+        direct_depot_distance = graph.edges[depot, route[0]]["distance"] + graph.edges[route[0], depot]["distance"]
+        reverse_depot_distance = graph.edges[depot, route[-1]]["distance"] + graph.edges[route[-1], depot]["distance"]
+
+        if direct_depot_distance <= reverse_depot_distance:
+            routes_graph.add_edge(depot, route[0], distance=graph.edges[depot, route[0]]["distance"])
+            routes_graph.add_edge(route[0], depot, distance=graph.edges[route[0], depot]["distance"])
         else:
-            graph.add_edge(route[-1], depot, distance=calculate_distance(nodes[route[-1]], nodes[depot]))
+            routes_graph.add_edge(depot, route[-1], distance=graph.edges[depot, route[-1]]["distance"])
+            routes_graph.add_edge(route[-1], depot, distance=graph.edges[route[-1], depot]["distance"])
 
+    shortest_paths = dict(nx.all_pairs_all_shortest_paths(routes_graph, weight="distance"))
 
-    shortest_paths = dict(nx.all_pairs_all_shortest_paths(graph, weight="distance"))
-
-    for source in nodes:
-        for target in nodes:
-
-            if demand_matrix[source][target] == 0 or len(shortest_paths[source][target]) == 0:
-                continue
-
-            coverage += demand_matrix[source][target] / _route_distance(nodes, shortest_paths[source][target][0])
+    for source, target in [edge for edge in graph.edges if graph.edges[edge]["demand"] != 0]:
+        coverage += graph.edges[source, target]["demand"] / _path_distance(graph, shortest_paths[source][target][0])
 
     return coverage
 
 
 def _fitness(
-    individual: list[int | None],
+    individual: Individual,
     *,
-    nodes: dict[int, Tuple[float, float]],
-    demand_matrix: list[list[int]],
+    graph: nx.DiGraph,
     total_distance_weight: float=1,
     demand_coverage_weight: float=1
 ) -> Tuple[float]:
 
     routes = individual_to_routes(individual)
 
-    total_distance = sum(_route_distance(nodes, route) for route in routes)
-    coverage = _coverage(nodes, demand_matrix, routes)
+    total_distance = sum(_route_distance(graph, route) for route in routes)
+    coverage = _coverage(graph, routes)
 
     fitness = total_distance_weight * total_distance - demand_coverage_weight * coverage
 
@@ -121,15 +141,14 @@ def _fitness(
 
 
 def _repair_missing_values(
-    nodes: dict[int, Tuple[float, float]],
+    graph: nx.DiGraph,
     routes_amount: int,
-    individual: list[int | None]
-) -> list[int | None]:
+    individual: Individual
+) -> Individual:
 
-    depot = 0
     routes_found = 1
 
-    entries = {node: 0 for node in nodes if node != depot}
+    entries = {node: 0 for node in graph if not graph.nodes[node]["is_depot"]}
 
     for node in individual:
         if node is None:
@@ -138,8 +157,8 @@ def _repair_missing_values(
 
         entries[node] += 1
 
-    missing = set(node for node in nodes
-                  if node != depot and entries[node] == 0)
+    missing = set(node for node in graph 
+                  if not graph.nodes[node]["is_depot"] and entries[node] == 0)
 
     for i in range(len(individual)):
 
@@ -172,7 +191,7 @@ def _repair_missing_values(
     return individual 
 
 
-def _repair_cycles(individual: list[int | None]) -> list[int | None]:
+def _repair_cycles(individual: Individual) -> Individual:
 
     i = 0
     while i < len(individual) - 1:
@@ -185,13 +204,13 @@ def _repair_cycles(individual: list[int | None]) -> list[int | None]:
 
 
 def _repair(
-    individual: list[int | None],
+    individual: Individual,
     *,
-    nodes: dict[int, Tuple[float, float]],
+    graph: nx.DiGraph,
     routes_amount: int
-) -> list[int | None]:
+) -> Individual:
 
-    individual = _repair_missing_values(nodes, routes_amount, individual)
+    individual = _repair_missing_values(graph, routes_amount, individual)
     individual = _repair_cycles(individual)
 
     return individual 
@@ -228,15 +247,13 @@ def _select_population(population: list, offsprings: list):
 
 
 def _mutate_insert(
-    individual: list[int | None],
+    individual: Individual,
     *,
-    nodes: dict[int, Tuple[float, float]],
+    graph: nx.DiGraph,
     indpb: float
-):
+) -> Individual:
 
-    depot = 0
-
-    used_nodes = [node for node in nodes if node != depot]
+    used_nodes = [node for node in graph if not graph.nodes[node]["is_depot"]]
 
     i = 0
     while i < len(individual):
@@ -251,24 +268,22 @@ def _mutate_insert(
 
 
 def get_toolbox(
-    nodes: dict[int, Tuple[float, float]],
-    demand_matrix: list[list[int]],
+    graph: nx.DiGraph,
     routes_amount: int,
     total_distance_weight: float,
     demand_coverage_weight: float
-):
+) -> base.Toolbox:
 
     toolbox = base.Toolbox()
 
-    toolbox.register("generate_individual", _generate_individual, nodes, routes_amount)
+    toolbox.register("generate_individual", _generate_individual, graph, routes_amount)
     toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.generate_individual)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
     toolbox.register(
         "evaluate",
         _fitness,
-        nodes=nodes,
-        demand_matrix=demand_matrix,
+        graph=graph,
         total_distance_weight=total_distance_weight,
         demand_coverage_weight=demand_coverage_weight
     )
@@ -277,14 +292,14 @@ def get_toolbox(
     toolbox.register(
         "mutate_insert",
         _mutate_insert,
-        nodes=nodes,
+        graph=graph,
         indpb=0.1
     )
     toolbox.register("select", tools.selRoulette)
     toolbox.register(
         "repair",
         _repair,
-        nodes=nodes,
+        graph=graph,
         routes_amount=routes_amount
     )
     toolbox.register("select_population", _select_population)
