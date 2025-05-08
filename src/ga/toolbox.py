@@ -9,8 +9,7 @@ from deap import (
 )
 
 from .utils import (
-    distance as calculate_distance,
-    individual_to_routes,
+    individual_to_routes
 )
 
 
