@@ -64,8 +64,8 @@ def ui_settings(layout: DeltaGenerator) -> Settings:
 
     routes_amount = layout.number_input(
         "Количество путей",
-        min_value=default_settings.routes_amount,
-        value=3
+        min_value=1,
+        value=default_settings.routes_amount
     )
 
 
@@ -149,12 +149,6 @@ def ui_main(
     if "graph" not in st.session_state:
         st.session_state.graph = None
 
-    # if "nodes" not in st.session_state:
-    #     st.session_state.nodes = None
-    #
-    # if "demand_matrix" not in st.session_state:
-    #     st.session_state.demand_matrix = None
-
     if "logbook" not in st.session_state:
         st.session_state.logbook = None
 
@@ -169,6 +163,18 @@ def ui_main(
 
     try:
         graph = nx.node_link_graph(json.loads(graph_file.getvalue().decode("utf-8")), edges="edges")
+
+        max_distance = max(graph.edges[edge]["distance"] for edge in graph.edges if graph.edges[edge]["distance"] is not None)
+
+        for edge in graph.edges:
+
+            if graph.edges[edge]["distance"] is not None:
+                graph.edges[edge]["connected"] = True
+                continue
+
+            graph.edges[edge]["distance"] = max_distance * graph.number_of_nodes()
+            graph.edges[edge]["connected"] = False
+
     except:
         st.session_state.graph = None
         layout.error("Неверный формат датасета")

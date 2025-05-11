@@ -63,16 +63,46 @@ def _route_distance(
 
     return distance + depot_distance
 
+def _check_penalty(
+    graph: nx.DiGraph,
+    route: list[int]
+) -> bool:
+
+    depot = [node for node in graph if graph.nodes[node]["is_depot"]][0]
+
+    if len(route) == 0:
+        return True 
+
+    for i in range(len(route) - 1):
+
+        if not graph.edges[route[i], route[i + 1]]["connected"] or \
+            not graph.edges[route[i + 1], route[i]]["connected"]:
+            return True
+
+    direct_depot_distance = graph.edges[depot, route[0]]["distance"] + graph.edges[route[0], depot]["distance"]
+    reverse_depot_distance = graph.edges[depot, route[-1]]["distance"] + graph.edges[route[-1], depot]["distance"]
+
+    if direct_depot_distance <= reverse_depot_distance:
+        if not graph.edges[depot, route[0]]["connected"] or \
+            not graph.edges[route[0], depot]["distance"]:
+            return True
+    else:
+        if not graph.edges[depot, route[-1]]["connected"] or \
+            not graph.edges[route[-1], depot]["distance"]:
+            return True
+    
+    return False
+
 
 def _path_distance(
     graph: nx.DiGraph,
-    route: list[int]
+    path: list[int]
 ) -> float:
 
     distance = 0
 
-    for i in range(len(route) - 1):
-        distance += graph.edges[route[i], route[i + 1]]["distance"]
+    for i in range(len(path) - 1):
+        distance += graph.edges[path[i], path[i + 1]]["distance"]
 
     return distance
 
@@ -103,20 +133,22 @@ def _coverage(
             routes_graph.add_edge(route[i], route[i + 1], distance=graph.edges[route[i], route[i + 1]]["distance"])
             routes_graph.add_edge(route[i + 1], route[i], distance=graph.edges[route[i + 1], route[i]]["distance"])
 
-        direct_depot_distance = graph.edges[depot, route[0]]["distance"] + graph.edges[route[0], depot]["distance"]
-        reverse_depot_distance = graph.edges[depot, route[-1]]["distance"] + graph.edges[route[-1], depot]["distance"]
-
-        if direct_depot_distance <= reverse_depot_distance:
-            routes_graph.add_edge(depot, route[0], distance=graph.edges[depot, route[0]]["distance"])
-            routes_graph.add_edge(route[0], depot, distance=graph.edges[route[0], depot]["distance"])
-        else:
-            routes_graph.add_edge(depot, route[-1], distance=graph.edges[depot, route[-1]]["distance"])
-            routes_graph.add_edge(route[-1], depot, distance=graph.edges[route[-1], depot]["distance"])
+        # direct_depot_distance = graph.edges[depot, route[0]]["distance"] + graph.edges[route[0], depot]["distance"]
+        # reverse_depot_distance = graph.edges[depot, route[-1]]["distance"] + graph.edges[route[-1], depot]["distance"]
+        #
+        # if direct_depot_distance <= reverse_depot_distance:
+        #     routes_graph.add_edge(depot, route[0], distance=graph.edges[depot, route[0]]["distance"])
+        #     routes_graph.add_edge(route[0], depot, distance=graph.edges[route[0], depot]["distance"])
+        # else:
+        #     routes_graph.add_edge(depot, route[-1], distance=graph.edges[depot, route[-1]]["distance"])
+        #     routes_graph.add_edge(route[-1], depot, distance=graph.edges[route[-1], depot]["distance"])
 
     shortest_paths = dict(nx.all_pairs_all_shortest_paths(routes_graph, weight="distance"))
 
     for source, target in [edge for edge in graph.edges if graph.edges[edge]["demand"] != 0]:
-        coverage += graph.edges[source, target]["demand"] / _path_distance(graph, shortest_paths[source][target][0])
+        if source == target or not source in shortest_paths or not target in shortest_paths[source] or graph.edges[source, target]["demand"] == 0:
+            continue
+        coverage += graph.edges[source, target]["demand"] / _path_distance(graph, shortest_paths[source][target][0]) * len(shortest_paths[source][target])
 
     return coverage
 
@@ -132,6 +164,11 @@ def _fitness(
     routes = individual_to_routes(individual)
 
     total_distance = sum(_route_distance(graph, route) for route in routes)
+    penalty = any(_check_penalty(graph, route) for route in routes)
+
+    if penalty:
+        return total_distance_weight * total_distance,
+
     coverage = _coverage(graph, routes)
 
     fitness = total_distance_weight * total_distance - demand_coverage_weight * coverage
@@ -266,6 +303,19 @@ def _mutate_insert(
     return individual
 
 
+def _individual_distance(individual: Individual, *, graph: nx.DiGraph) -> float:
+
+    routes = individual_to_routes(individual)
+
+    return sum(_route_distance(graph, route) for route in routes)
+
+def _individual_coverage(individual: Individual, *, graph: nx.DiGraph) -> float:
+
+    routes = individual_to_routes(individual)
+
+    return _coverage(graph, routes)
+
+
 def get_toolbox(
     graph: nx.DiGraph,
     routes_amount: int,
@@ -302,5 +352,7 @@ def get_toolbox(
         routes_amount=routes_amount
     )
     toolbox.register("select_population", _select_population)
+    toolbox.register("individual_distance", _individual_distance, graph=graph)
+    toolbox.register("individual_coverage", _individual_coverage, graph=graph)
 
     return toolbox

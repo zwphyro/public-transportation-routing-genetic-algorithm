@@ -1,18 +1,9 @@
 from dataclasses import dataclass
-from typing import Tuple
-import math
 
 import matplotlib.pyplot as plt
 from matplotlib import colormaps
 from matplotlib import colors
 import networkx as nx
-
-
-def distance(
-    node1: Tuple[float, float],
-    node2: Tuple[float, float]
-) -> float:
-    return math.sqrt((node1[0] - node2[0]) ** 2 + (node1[1] - node2[1]) ** 2)
 
 
 @dataclass()
@@ -79,6 +70,10 @@ def plot_individ(
     current_width = initial_width
 
     for route in routes:
+
+        if len(route) == 0:
+            continue
+        
         edgelist = [(route[i], route[i + 1]) for i in range(len(route) - 1)]
         current_edge_color = next(color_generator)
         nx.draw_networkx_edges(
@@ -116,7 +111,7 @@ def plot_structure(
     *,
     node_size: int=300,
     font_size: int=12,
-    display_connections: bool=False
+    display_connections: bool=True
 ):
 
     palette = Palette()
@@ -147,17 +142,20 @@ def plot_structure(
         font_size=font_size,
         ax=ax
     )
-    if display_connections:
-        distance_edges = [edge for edge in graph.edges() if graph.edges[edge]["distance"] is not None] 
+
+    distance_edges = [edge for edge in graph.edges() if graph.edges[edge]["connected"]] 
+
+    if len(distance_edges) / graph.number_of_nodes() < 10:
         nx.draw_networkx_edges(
             graph,
             positions,
             edgelist=distance_edges,
-            edge_color="#CCCCCC05",
+            edge_color="#AAAAAA",
             node_size=node_size,
             width=2,
             ax=ax
         )
+
     demand_edges = [edge for edge in graph.edges() if graph.edges[edge]["demand"] != 0]
     nx.draw_networkx_edges(
         graph,
@@ -175,6 +173,5 @@ def plot_structure(
         font_size=font_size,
         ax=ax
     )
-
 
     return fig, ax

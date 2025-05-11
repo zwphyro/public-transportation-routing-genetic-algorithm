@@ -26,7 +26,7 @@ def algorithm(
 ) -> Iterable[tuple[list, tools.Logbook]]:
 
     logbook = tools.Logbook()
-    logbook.header = ["generation_index", "fittest_individual"] + stats.fields
+    logbook.header = ["generation_index", "fittest_individual", "fittest_distance", "fittest_coverage"] + stats.fields
 
     fitnesses = list(map(toolbox.evaluate, population))
     for individ, fitness in zip(population, fitnesses):
@@ -35,8 +35,11 @@ def algorithm(
     generation_index = 0
 
     fittest_individual = _get_fittest_individual(population)
+    fittest_distance = toolbox.individual_distance(fittest_individual)
+    fittest_coverage = toolbox.individual_coverage(fittest_individual)
     record = stats.compile(population)
-    logbook.record(generation_index=generation_index, fittest_individual=fittest_individual, **record)
+    logbook.record(generation_index=generation_index, fittest_individual=fittest_individual, fittest_distance=fittest_distance, **record)
+    logbook.record(generation_index=generation_index, fittest_individual=fittest_individual, fittest_coverage=fittest_coverage, fittest_distance=fittest_distance, **record)
 
     yield population, logbook
 
@@ -79,8 +82,10 @@ def algorithm(
         population[:] = new_population
 
         fittest_individual = _get_fittest_individual(population)
+        fittest_distance = toolbox.individual_distance(fittest_individual)
+        fittest_coverage = toolbox.individual_coverage(fittest_individual)
         record = stats.compile(population)
-        logbook.record(generation_index=generation_index, fittest_individual=fittest_individual, **record)
+        logbook.record(generation_index=generation_index, fittest_individual=fittest_individual, fittest_coverage=fittest_coverage, fittest_distance=fittest_distance, **record)
 
         yield population, logbook
 
