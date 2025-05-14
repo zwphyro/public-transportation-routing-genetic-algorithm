@@ -36,9 +36,9 @@ def algorithm(
 
     fittest_individual = _get_fittest_individual(population)
     fittest_distance = toolbox.individual_distance(fittest_individual)
-    fittest_coverage = toolbox.individual_coverage(fittest_individual)
+    penalty = toolbox.individual_penalty(fittest_individual)
+    fittest_coverage = None if penalty else toolbox.individual_coverage(fittest_individual)
     record = stats.compile(population)
-    logbook.record(generation_index=generation_index, fittest_individual=fittest_individual, fittest_distance=fittest_distance, **record)
     logbook.record(generation_index=generation_index, fittest_individual=fittest_individual, fittest_coverage=fittest_coverage, fittest_distance=fittest_distance, **record)
 
     yield population, logbook
@@ -83,7 +83,8 @@ def algorithm(
 
         fittest_individual = _get_fittest_individual(population)
         fittest_distance = toolbox.individual_distance(fittest_individual)
-        fittest_coverage = toolbox.individual_coverage(fittest_individual)
+        penalty = toolbox.individual_penalty(fittest_individual)
+        fittest_coverage = None if penalty else toolbox.individual_coverage(fittest_individual)
         record = stats.compile(population)
         logbook.record(generation_index=generation_index, fittest_individual=fittest_individual, fittest_coverage=fittest_coverage, fittest_distance=fittest_distance, **record)
 

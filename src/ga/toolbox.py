@@ -133,16 +133,6 @@ def _coverage(
             routes_graph.add_edge(route[i], route[i + 1], distance=graph.edges[route[i], route[i + 1]]["distance"])
             routes_graph.add_edge(route[i + 1], route[i], distance=graph.edges[route[i + 1], route[i]]["distance"])
 
-        # direct_depot_distance = graph.edges[depot, route[0]]["distance"] + graph.edges[route[0], depot]["distance"]
-        # reverse_depot_distance = graph.edges[depot, route[-1]]["distance"] + graph.edges[route[-1], depot]["distance"]
-        #
-        # if direct_depot_distance <= reverse_depot_distance:
-        #     routes_graph.add_edge(depot, route[0], distance=graph.edges[depot, route[0]]["distance"])
-        #     routes_graph.add_edge(route[0], depot, distance=graph.edges[route[0], depot]["distance"])
-        # else:
-        #     routes_graph.add_edge(depot, route[-1], distance=graph.edges[depot, route[-1]]["distance"])
-        #     routes_graph.add_edge(route[-1], depot, distance=graph.edges[route[-1], depot]["distance"])
-
     shortest_paths = dict(nx.all_pairs_all_shortest_paths(routes_graph, weight="distance"))
 
     for source, target in [edge for edge in graph.edges if graph.edges[edge]["demand"] != 0]:
@@ -309,6 +299,12 @@ def _individual_distance(individual: Individual, *, graph: nx.DiGraph) -> float:
 
     return sum(_route_distance(graph, route) for route in routes)
 
+def _individual_penalty(individual: Individual, *, graph: nx.DiGraph) -> bool:
+
+    routes = individual_to_routes(individual)
+
+    return any(_check_penalty(graph, route) for route in routes)
+
 def _individual_coverage(individual: Individual, *, graph: nx.DiGraph) -> float:
 
     routes = individual_to_routes(individual)
@@ -352,7 +348,9 @@ def get_toolbox(
         routes_amount=routes_amount
     )
     toolbox.register("select_population", _select_population)
+
     toolbox.register("individual_distance", _individual_distance, graph=graph)
+    toolbox.register("individual_penalty", _individual_penalty, graph=graph)
     toolbox.register("individual_coverage", _individual_coverage, graph=graph)
 
     return toolbox

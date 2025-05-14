@@ -1,4 +1,5 @@
 import json
+import time
 
 from deap.tools import Logbook
 import streamlit as st
@@ -152,6 +153,9 @@ def ui_main(
     if "logbook" not in st.session_state:
         st.session_state.logbook = None
 
+    if "time_diff" not in st.session_state:
+        st.session_state.time_diff = None
+
     layout.markdown("# Выполнение алгоритма")
 
     graph_file = layout.file_uploader("Загрузить датасет", type=["json"])
@@ -189,12 +193,14 @@ def ui_main(
     start_execution = layout.button("Начать выполнение")
 
     metrics_column, individ_column = layout.columns(2)
-    generation_container = metrics_column.empty()
+    generation_layout, time_layout = metrics_column.columns(2)
     min_metric_layout, max_metric_layout = metrics_column.columns(2)
     mean_metric_layout, std_metric_layout = metrics_column.columns(2)
 
     individ_container = individ_column.empty()
 
+    generation_container = generation_layout.empty()
+    time_container = time_layout.empty()
     min_metric_container = min_metric_layout.empty()
     max_metric_container = max_metric_layout.empty()
     mean_metric_container = mean_metric_layout.empty()
@@ -227,6 +233,7 @@ def ui_main(
     if start_execution:
 
         chart_container.empty()
+        time_container.empty()
         dataframe_container.empty()
 
         chart = live_chart_container.line_chart()
@@ -241,11 +248,17 @@ def ui_main(
 
             update_metrics(current_stats)
 
+        start_time = time.time()
+
         run_algorithm(
             st.session_state.graph,
             settings,
             iteration_callback
         )
+        
+        end_time = time.time()
+
+        st.session_state.time_diff = end_time - start_time
 
         live_chart_container.empty()
 
@@ -261,3 +274,6 @@ def ui_main(
     individual = st.session_state.logbook[-1]["fittest_individual"]
     fig, _ = plot_individ(st.session_state.graph, individual_to_routes(individual), node_size=100, font_size=5)
     individ_container.pyplot(fig)
+
+    if st.session_state.time_diff is not None:
+        time_container.metric("Время выполнения", f"{st.session_state.time_diff:.2f} с")
